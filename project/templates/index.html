@@ -1,220 +1,134 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CyberGuard Scanner Dashboard</title>
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&family=Inter:wght@400;600&display=swap" rel="stylesheet">
-    
-    <style>
-        body { 
-            background-color: #f4f7f6; 
-            font-family: 'Inter', sans-serif;
-        }
-        .navbar {
-            box-shadow: 0 2px 4px rgba(0,0,0,.1);
-        }
-        .card {
-            border: none;
-            border-radius: 12px;
-            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-            margin-bottom: 20px;
-        }
-        .card-header {
-            background-color: #fff;
-            border-bottom: 1px solid #edf2f9;
-            font-weight: 600;
-            padding: 1.25rem;
-            border-radius: 12px 12px 0 0 !important;
-        }
-        .btn-primary {
-            background-color: #4e73df;
-            border-color: #4e73df;
-            padding: 0.6rem;
-            font-weight: 600;
-        }
-        .table thead th {
-            background-color: #f8f9fc;
-            text-transform: uppercase;
-            font-size: 0.75rem;
-            letter-spacing: 0.05em;
-            color: #b7c1d1;
-            border-top: none;
-        }
-        .ip-badge {
-            font-family: 'Roboto Mono', monospace;
-            background-color: #eef2f7;
-            padding: 4px 8px;
-            border-radius: 4px;
-            color: #2c3e50;
-            white-space: nowrap;
-        }
-        .banner-text {
-            font-family: 'Roboto Mono', monospace;
-            font-size: 0.8rem;
-            color: #6c757d;
-            word-break: break-all;
-            display: block;
-            min-width: 150px;
-        }
-        .vuln-text {
-            font-family: 'Roboto Mono', monospace;
-            font-size: 0.8rem;
-            color: #e74c3c;
-            font-weight: 600;
-            white-space: pre-line; /* Сохраняет переносы строк для списка CVE */
-        }
-        .status-pulse {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 5px;
-            background-color: #2ecc71;
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
-        }
-        .d-none { display: none !important; }
-    </style>
-</head>
-<body>
+{% extends "base.html" %}
 
-    <!-- Навигация -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-        <div class="container">
-            <a class="navbar-brand" href="/">
-                🛡️ <strong>CyberGuard</strong> <span class="text-muted" style="font-size: 0.8rem;">v1.0</span>
-            </a>
-            <span class="navbar-text">Dashboard управления сканером</span>
+{% block content %}
+    <div id="scan-alert" class="alert alert-primary border-0 shadow-sm {% if not is_scanning %}d-none{% endif %}" role="alert">
+        <div class="d-flex align-items-center">
+            <div class="spinner-border spinner-border-sm me-3" role="status"></div>
+            <div><strong>Идет активное сканирование...</strong> Результаты появятся автоматически.</div>
         </div>
-    </nav>
+    </div>
 
-    <div class="container-fluid px-4">
-        
-        <!-- Индикатор активного сканирования -->
-        <div id="scan-alert" class="alert alert-primary border-0 shadow-sm {% if not is_scanning %}d-none{% endif %}" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="spinner-border spinner-border-sm me-3" role="status"></div>
-                <div>
-                    <strong>Идет активное сканирование...</strong> Пожалуйста, подождите. Страница обновится автоматически, как только отчет будет готов.
+    <div class="row">
+        <!-- Левая панель -->
+        <div class="col-xl-3 col-lg-4">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white fw-bold">⚙️ Быстрый запуск</div>
+                <div class="card-body">
+                    <form action="/scan" method="post" id="scan-form">
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-bold">Целевые IP / Подсети</label>
+                            <input type="text" name="targets" class="form-control form-control-sm" value="{{ config.scanner.targets }}" required {% if is_scanning %}disabled{% endif %}>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-bold">Порты</label>
+                            <input type="text" name="ports" class="form-control form-control-sm" value="{{ config.scanner.ports }}" required {% if is_scanning %}disabled{% endif %}>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 btn-sm fw-bold" {% if is_scanning %}disabled{% endif %}>
+                            🚀 Запустить сейчас
+                        </button>
+                    </form>
                 </div>
             </div>
-        </div>
 
-        <div class="row">
-            <!-- Панель управления -->
-            <div class="col-xl-3 col-lg-4">
-                <div class="card">
-                    <div class="card-header">⚙️ Настройки сканера</div>
-                    <div class="card-body">
-                        <form action="/scan" method="post" id="scan-form">
-                            <div class="mb-3">
-                                <label class="form-label text-muted small fw-bold">Целевые IP / Подсети</label>
-                                <input type="text" name="targets" class="form-control" value="{{ config.scanner.targets }}" required {% if is_scanning %}disabled{% endif %}>
-                                <div class="form-text small">Напр: 192.168.1.1, 10.0.0.0/24 или AS15169</div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label text-muted small fw-bold">Порты</label>
-                                <input type="text" name="ports" class="form-control" value="{{ config.scanner.ports }}" required {% if is_scanning %}disabled{% endif %}>
-                                <div class="form-text small">Напр: 80,443 или 1-65535</div>
-                            </div>
-                            <hr>
-                            <button type="submit" class="btn btn-primary w-100 fw-bold" {% if is_scanning %}disabled{% endif %}>
-                                {% if is_scanning %}Выполняется...{% else %}🚀 Запустить сканирование{% endif %}
-                            </button>
-                        </form>
-                    </div>
-                </div>
-
-                <div class="card shadow-sm">
-                    <div class="card-body py-3 d-flex justify-content-between align-items-center">
+            <div class="card shadow-sm">
+                <div class="card-body py-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
                         <span class="text-muted small fw-bold">Всего в базе:</span>
                         <span class="badge bg-dark rounded-pill" style="font-size: 0.9rem;">{{ results|length }}</span>
                     </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted small fw-bold">Следующий авто-скан:</span>
+                        <!-- ID добавлено для JS, цвет меняется динамически -->
+                        <span id="next-scan-badge" class="badge {% if config.scheduling.enabled %}bg-success{% else %}bg-secondary{% endif %} fw-bold">
+                            {{ next_scan }}
+                        </span>
+                    </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Таблица результатов -->
-            <div class="col-xl-9 col-lg-8">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>🔍 Обнаруженные открытые порты</span>
-                        <a href="/" class="btn btn-sm btn-outline-secondary">🔄 Обновить данные</a>
+        <!-- Таблица результатов -->
+        <div class="col-xl-9 col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center bg-white py-3">
+                    <span class="fw-bold text-dark">🔍 Обнаруженные открытые порты</span>
+                    <div class="btn-group">
+                        <a href="/" class="btn btn-sm btn-outline-secondary">🔄 Обновить</a>
+                        <form action="/results/clear" method="post" onsubmit="return confirm('Вы уверены? Это удалит всю историю.');" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-outline-danger ms-2">🗑️ Очистить базу</button>
+                        </form>
                     </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead>
-                                    <tr>
-                                        <th class="ps-4">Цель (IP:Port)</th>
-                                        <th>Сервис</th>
-                                        <th>Баннер</th>
-                                        <th>CVE / Vulnerabilities</th>
-                                        <th class="pe-4">Дата</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for row in results %}
-                                    <tr>
-                                        <td class="ps-4">
-                                            <span class="status-pulse"></span>
-                                            <span class="ip-badge">{{ row[0] }}:{{ row[1] }}</span>
-                                        </td>
-                                        <td><strong class="text-dark">{{ row[3] }}</strong></td>
-                                        <td>
-                                            <span class="banner-text" title="{{ row[4] }}">
-                                                {{ row[4] if row[4] else 'N/A' }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div class="vuln-text">
-                                                {{ row[5] if row[5] else 'No critical CVEs' }}
-                                            </div>
-                                        </td>
-                                        <td class="pe-4 text-muted small">
-                                            {{ row[6][:16] }}
-                                        </td>
-                                    </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td colspan="5" class="text-center py-5 text-muted">
-                                            База данных пуста. Запустите первое сканирование!
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">Цель (IP:Port)</th>
+                                    <th>Сервис</th>
+                                    <th>Баннер</th>
+                                    <th>CVE / Vulnerabilities</th>
+                                    <th class="pe-4">Дата</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in results %}
+                                <tr>
+                                    <td class="ps-4">
+                                        <span class="status-pulse"></span>
+                                        <span class="ip-badge">{{ row[0] }}:{{ row[1] }}</span>
+                                    </td>
+                                    <td><strong>{{ row[3] }}</strong></td>
+                                    <td><span class="banner-text" title="{{ row[4] }}">{{ row[4] if row[4] else 'N/A' }}</span></td>
+                                    <td><div class="vuln-text py-2">{{ (row[5] if row[5] else 'No critical CVEs') | safe }}</div></td>
+                                    <td class="small text-muted">{{ row[6][:16] }}</td>
+                                    <td class="pe-4">
+                                        <form action="/results/delete" method="post">
+                                            <input type="hidden" name="ip" value="{{ row[0] }}">
+                                            <input type="hidden" name="port" value="{{ row[1] }}">
+                                            <button type="submit" class="btn btn-sm text-danger border-0 bg-transparent">❌</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="6" class="text-center py-5 text-muted">База данных пуста.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+{% endblock %}
 
-    <!-- JavaScript для автообновления страницы при завершении сканирования -->
+{% block extra_js %}
     <script>
-        {% if is_scanning %}
-        const pollInterval = setInterval(async () => {
+        // Функция опроса статуса
+        setInterval(async () => {
             try {
                 const response = await fetch('/status');
                 const data = await response.json();
                 
+                // Обновляем текст и цвет Badge времени
+                const badge = document.getElementById('next-scan-badge');
+                if (badge) {
+                    badge.innerText = data.next_scan;
+                    if (data.is_enabled) {
+                        badge.className = "badge bg-success fw-bold";
+                    } else {
+                        badge.className = "badge bg-secondary fw-bold";
+                    }
+                }
+
+                // Перезагрузка при окончании сканирования
+                {% if is_scanning %}
                 if (data.status === 'idle') {
-                    clearInterval(pollInterval);
                     window.location.href = "/"; 
                 }
-            } catch (err) {
-                console.error("Ошибка при проверке статуса:", err);
-            }
+                {% endif %}
+            } catch (err) { console.error("Status check failed", err); }
         }, 3000);
-        {% endif %}
     </script>
-</body>
-</html>
+{% endblock %}

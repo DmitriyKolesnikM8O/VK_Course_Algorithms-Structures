@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Настройки - CyberGuard{% endblock %}
+
+{% block content %}
+    <div class="container p-0">
+        <h2 class="mb-4 fw-bold">Управление конфигурацией</h2>
+        
+        {% if saved %}
+        <div class="alert alert-success border-0 shadow-sm mb-4">✅ Настройки успешно сохранены и применены!</div>
+        {% endif %}
+
+        <form action="/settings/save" method="post">
+            <div class="row">
+                <!-- Левая колонка -->
+                <div class="col-md-6">
+                    <div class="card p-4 mb-4 shadow-sm">
+                        <h5 class="mb-3 fw-bold text-primary">📡 Глобальный профиль</h5>
+                        <p class="text-muted small">Значения, которые будут подставляться на Дашборде по умолчанию.</p>
+                        <div class="mb-3">
+                            <label class="small fw-bold text-muted">Цели (Targets)</label>
+                            <input type="text" name="scanner_targets" class="form-control" value="{{ config.scanner.targets }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="small fw-bold text-muted">Порты (Ports)</label>
+                            <input type="text" name="scanner_ports" class="form-control" value="{{ config.scanner.ports }}">
+                        </div>
+                        <div class="row">
+                            <div class="col-6">
+                                <label class="small fw-bold text-muted">Скорость (Rate)</label>
+                                <input type="number" name="scanner_rate" class="form-control" value="{{ config.scanner.rate }}">
+                            </div>
+                            <div class="col-6">
+                                <label class="small fw-bold text-muted">Интерфейс</label>
+                                <input type="text" name="scanner_interface" class="form-control" value="{{ config.scanner.interface }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card p-4 mb-4 shadow-sm border-primary">
+                        <h5 class="mb-3 fw-bold text-primary">⏰ Автоматизация</h5>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="sched_enabled" id="schedEnabled" 
+                                   {% if config.scheduling and config.scheduling.enabled %}checked{% endif %}>
+                            <label class="form-check-label fw-bold" for="schedEnabled">Включить периодическое сканирование</label>
+                        </div>
+                        <div class="mb-2">
+                            <label class="small fw-bold">Интервал запуска (в минутах)</label>
+                            <input type="number" name="sched_interval" class="form-control" 
+                                   value="{{ config.scheduling.interval_minutes if config.scheduling else 60 }}" min="1">
+                        </div>
+                    </div>               
+                </div> <!-- Конец левой колонки -->
+
+                <!-- Правая колонка -->
+                <div class="col-md-6">
+                    <div class="card p-4 mb-4 shadow-sm">
+                        <h5 class="mb-3 fw-bold text-primary">🔑 Ключи и Оповещения</h5>
+                        <div class="mb-3">
+                            <label class="small fw-bold text-muted">Telegram Bot Token</label>
+                            <input type="password" name="tg_token" class="form-control" value="{{ config.telegram.token }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="small fw-bold text-muted">Telegram Chat ID</label>
+                            <input type="text" name="tg_chat_id" class="form-control" value="{{ config.telegram.chat_id }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="small fw-bold text-muted">Vulners API Key</label>
+                            <input type="password" name="vulners_key" class="form-control" value="{{ config.vulners.api_key }}">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100 fw-bold btn-lg shadow-sm mt-2" {% if is_scanning %}disabled{% endif %}>
+                        💾 Сохранить изменения
+                    </button>
+                </div> <!-- Конец правой колонки -->
+            </div>
+        </form>
+
+        <!-- Спойлер для JSON -->
+        <div class="accordion mt-2 mb-5 shadow-sm" id="jsonAccordion">
+            <div class="accordion-item border-0" style="border-radius: 12px; overflow: hidden;">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseJSON">
+                        📄 Просмотр Config.json
+                    </button>
+                </h2>
+                <div id="collapseJSON" class="accordion-collapse collapse" data-bs-parent="#jsonAccordion">
+                    <div class="accordion-body p-0">
+                        <pre class="m-0" style="background: #2d2d2d; color: #a9b7c6; padding: 15px; border-radius: 0; font-size: 0.85rem; font-family: 'Roboto Mono', monospace;"><code>{{ config_json }}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -7,6 +7,7 @@ from src.database import DatabaseManager
 from src.notifier import TelegramNotifier
 from src.vulnerability_scanner import NmapAnalyzer
 from src.cve_checker import VulnersChecker
+from src.exploit_linker import ExploitLinker
 
 async def main():
     with open("config/config.yaml", "r") as f:
@@ -47,7 +48,10 @@ async def main():
 
                                     
             vuln_list = await v_checker.get_cves(service_name, version)
-            vuln_str = "\n".join(vuln_list) if vuln_list else "No critical CVEs found"
+
+            enrichted_vulns = ExploitLinker.wrap_cve_with_links(vuln_list)
+
+            vuln_str = "\n".join(enrichted_vulns) if enrichted_vulns else "No critical CVEs found"
 
             res.vulns = vuln_str
             

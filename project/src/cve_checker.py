@@ -28,7 +28,7 @@ class VulnersChecker:
         try:
             # Метод 1: find_all (самый стабильный, хоть и с варнингом)
             if hasattr(self.client, 'find_all'):
-                results = await asyncio.to_thread(self.client.find_all, query)
+                results = await asyncio.to_thread(self.client.search.search_bulletins_all, query=query)
             
             # Метод 2: Если find_all нет, пробуем search
             elif hasattr(self.client, 'search'):
@@ -43,15 +43,18 @@ class VulnersChecker:
 
             # Обработка результатов
             cve_list = []
-            if results and isinstance(results, list):
-                for item in results[:5]:
+            if results:
+                # Так как теперь это итератор, просто берем первые 5 элементов через цикл
+                count = 0
+                for item in results:
+                    if count >= 5: break
+                    
                     cve_id = item.get("id", "N/A")
                     cvss = item.get("cvss", {}).get("score", 0) if isinstance(item.get("cvss"), dict) else 0
                     cve_list.append(f"• {cve_id} (CVSS: {cvss})")
+                    count += 1
                 return cve_list
-            
             return []
-
         except Exception as e:
             if "403" in str(e):
                 print(f"[!] Vulners API 403: Доступ запрещен. Проверьте тариф Community на сайте.")
