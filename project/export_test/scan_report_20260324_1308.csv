@@ -1,0 +1,53 @@
+IP,Port,Protocol,Service,Banner,Vulnerabilities,Timestamp
+45.33.32.156,22,tcp,ssh,SSH-2.0-OpenSSH_6.6.1p1 Ubuntu-2ubuntu2.13,No critical CVEs found,2026-03-24 11:36:06.369161
+45.33.32.156,80,tcp,Apache httpd 2.4.7,"HTTP/1.1 200 OK
+Date: Tue, 24 Mar 2026 08:38:58 GMT
+Server: Apache/2.4.7 (Ubuntu)
+Accept-Ranges: bytes
+Vary: Accept-Encoding
+Transfer-Encoding: chunked
+Content-Type: text/html
+
+4c
+<!DOCTYPE h","<b>• HTTPD:8EFEF9AED09575018B1942E8DC95B48B (CVSS: 4.3)</b>
+[<a href='https://vulners.com/search?query=HTTPD:8EFEF9AED09575018B1942E8DC95B48B'>Details</a>] [<a href='https://sploitus.com/?query=HTTPD:8EFEF9AED09575018B1942E8DC95B48B'>Exploits</a>]
+
+<b>• 1337DAY-ID-22451 (CVSS: 6.8)</b>
+[<a href='https://vulners.com/search?query=1337DAY-ID-22451'>Details</a>] [<a href='https://sploitus.com/?query=1337DAY-ID-22451'>Exploits</a>]
+
+<b>• OPENVAS:13614125623111020140305 (CVSS: 6.8)</b>
+[<a href='https://vulners.com/search?query=OPENVAS:13614125623111020140305'>Details</a>] [<a href='https://sploitus.com/?query=OPENVAS:13614125623111020140305'>Exploits</a>]
+
+<b>• OPENVAS:13614125623111020140527 (CVSS: 5.4)</b>
+[<a href='https://vulners.com/search?query=OPENVAS:13614125623111020140527'>Details</a>] [<a href='https://sploitus.com/?query=OPENVAS:13614125623111020140527'>Exploits</a>]
+
+<b>• OPENVAS:13614125623111020140135 (CVSS: 5.0)</b>
+[<a href='https://vulners.com/search?query=OPENVAS:13614125623111020140135'>Details</a>] [<a href='https://sploitus.com/?query=OPENVAS:13614125623111020140135'>Exploits</a>]",2026-03-24 11:36:06.369161
+170.210.180.50,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.132,179,tcp,bgp,No text banner (binary?),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.150,443,tcp,https,No text banner (binary?),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.22,443,tcp,ADoH Server,No text banner (binary?),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.13,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.140,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.4,179,tcp,bgp,No text banner (binary?),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.193,179,tcp,bgp,No text banner (binary?),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.1,179,tcp,bgp,No text banner (binary?),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.205,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.9,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.8,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.136,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.10,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.12,53,tcp,tcpwrapped,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.198,179,tcp,bgp,No text banner (binary?),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.204,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.11,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.153,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.152,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.197,179,tcp,bgp,No text banner (binary?),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.202,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.24,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.216,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+206.51.255.1,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.200,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.217,53,tcp,unknown,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833
+66.102.43.25,53,tcp,domain,No banner (silent service),No critical CVEs found,2026-03-24 11:58:15.096833

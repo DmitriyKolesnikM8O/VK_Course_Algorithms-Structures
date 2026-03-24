@@ -1,3 +1,5 @@
+import csv
+import io
 import asyncio
 import traceback
 import yaml
@@ -7,8 +9,8 @@ import os
 import json
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, Request, Form, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 # Импорт логики и менеджера БД
@@ -146,6 +148,45 @@ async def settings_page(request: Request, saved: bool = False):
         "config": config, "config_json": json.dumps(config, indent=4, ensure_ascii=False),
         "is_scanning": (SCAN_STATUS == "scanning"), "saved": saved, "active_page": "settings"
     })
+
+@app.get("/export/csv")
+async def export_csv():
+    config = load_config()
+    db_path = os.path.abspath(config['database']['path'])
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["IP", "Port", "Protocol", "Service", "Banner", "Vulnerabilities", "Timestamp"])
+    
+    if os.path.exists(db_path):
+        async with aiosqlite.connect(db_path) as db:
+            async with db.execute("SELECT * FROM scan_results") as cursor:
+                async for row in cursor:
+                    writer.writerow(row)
+    
+    output.seek(0)
+    headers = {"Content-Disposition": f"attachment; filename=scan_report_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"}
+    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers=headers)
+
+@app.get("/export/json")
+async def export_json():
+    config = load_config()
+    db_path = os.path.abspath(config['database']['path'])
+    data = []
+    if os.path.exists(db_path):
+        async with aiosqlite.connect(db_path) as db:
+            async with db.execute("SELECT * FROM scan_results") as cursor:
+                async for row in cursor:
+                    data.append({
+                        "ip": row[0], "port": row[1], "protocol": row[2],
+                        "service": row[3], "banner": row[4], "vulns": row[5],
+                        "timestamp": row[6]
+                    })
+    
+    # КРАСИВОЕ ФОРМАТИРОВАНИЕ: indent=4 делает JSON читаемым
+    json_pretty = json.dumps(data, indent=4, ensure_ascii=False)
+    filename = f"scan_report_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
+    headers = {"Content-Disposition": f"attachment; filename={filename}"}
+    return Response(content=json_pretty, media_type="application/json", headers=headers)
 
 @app.post("/settings/save")
 async def save_all_settings(

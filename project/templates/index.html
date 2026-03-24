@@ -54,6 +54,16 @@
                     <span class="fw-bold text-dark">🔍 Обнаруженные открытые порты</span>
                     <div class="btn-group">
                         <a href="/" class="btn btn-sm btn-outline-secondary">🔄 Обновить</a>
+                        <!-- НОВАЯ КНОПКА ЭКСПОРТА -->
+                        <div class="dropdown d-inline-block ms-2">
+                            <button class="btn btn-sm btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                📦 Экспорт
+                            </button>
+                            <ul class="dropdown-menu shadow">
+                                <li><a class="dropdown-item small fw-bold" href="/export/csv">📄 Скачать CSV (Excel)</a></li>
+                                <li><a class="dropdown-item small fw-bold" href="/export/json">📄 Скачать JSON</a></li>
+                            </ul>
+                        </div>
                         <form action="/results/clear" method="post" onsubmit="return confirm('Вы уверены? Это удалит всю историю.');" style="display:inline;">
                             <button type="submit" class="btn btn-sm btn-outline-danger ms-2">🗑️ Очистить базу</button>
                         </form>
