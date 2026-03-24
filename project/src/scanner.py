@@ -14,37 +14,59 @@ class MasscanScanner:
             "-p", self.cfg['ports'],
             "--max-rate", str(self.cfg['rate']),
             "-e", self.cfg['interface'],
-            "-oJ", "-"  # Вывод JSON в stdout
+            "-oJ", "-", 
         ]
+        
+        print(f"[MASSCAN] Команда: {' '.join(cmd)}")
         
         process = await asyncio.create_subprocess_exec(
             *cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
         )
-        stdout, stderr = await process.communicate()
 
-        # Мы игнорируем stderr, так как Masscan пишет туда служебную инфу
-        if not stdout:
+        stdout_chunks = []
+
+        # Функция для чтения прогресса (stderr)
+        async def read_stderr():
+            while True:
+                line = await process.stderr.readline()
+                if not line:
+                    break
+                text = line.decode().strip()
+                if "waiting" in text or "remaining" in text or "done" in text:
+                    print(f"    [MASSCAN PROGRESS] {text}")
+
+        # Функция для чтения результатов (stdout)
+        async def read_stdout():
+            while True:
+                line = await process.stdout.readline()
+                if not line:
+                    break
+                stdout_chunks.append(line.decode())
+
+        # Запускаем чтение обоих потоков параллельно
+        await asyncio.gather(read_stderr(), read_stdout())
+        
+        # Ждем завершения процесса
+        await process.wait()
+
+        raw_output = "".join(stdout_chunks).strip()
+        if not raw_output:
             return []
 
         try:
-            # Декодируем и чистим вывод (иногда Masscan добавляет мусор)
-            raw_output = stdout.decode().strip()
-            if not raw_output or raw_output == "[]":
-                return []
-                
-            data = json.loads(raw_output)
-            results = []
-            for entry in data:
-                ip = entry['ip']
-                for p_info in entry['ports']:
-                    results.append(PortResult(
-                        ip=ip, 
-                        port=p_info['port'], 
-                        protocol=p_info['proto']
-                    ))
-            return results
+            # Чистим мусор перед JSON (иногда masscan выводит текст в stdout)
+            start_index = raw_output.find('[')
+            if start_index != -1:
+                data = json.loads(raw_output[start_index:])
+                results = []
+                for entry in data:
+                    ip = entry['ip']
+                    for p_info in entry['ports']:
+                        results.append(PortResult(ip=ip, port=p_info['port'], protocol=p_info['proto']))
+                return results
+            return []
         except Exception as e:
             print(f"[!] Ошибка парсинга JSON: {e}")
             return []

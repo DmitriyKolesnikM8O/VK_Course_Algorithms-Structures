@@ -6,13 +6,21 @@ class TelegramNotifier:
         self.chat_id = chat_id
 
     async def send_message(self, text: str):
+        # Telegram ограничивает длину сообщения 4096 символами
+        if len(text) > 4000:
+            text = text[:3900] + "\n... (сообщение обрезано)"
+
         payload = {
             "chat_id": self.chat_id,
             "text": text,
-            "parse_mode": "HTML"
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True
         }
         async with httpx.AsyncClient() as client:
             try:
-                await client.post(self.url, json=payload)
+                response = await client.post(self.url, json=payload, timeout=15.0)
+                if response.status_code != 200:
+                    print(f"[!] Telegram Error {response.status_code}: {response.text}")
+                return response
             except Exception as e:
-                print(f"[!] Error sending notification: {e}")
+                print(f"[!] Ошибка отправки уведомления: {e}")
