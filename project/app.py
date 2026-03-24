@@ -181,6 +181,47 @@ async def start_scan(targets: str = Form(...), ports: str = Form(...)):
     asyncio.create_task(background_scan_task())
     return RedirectResponse(url="/", status_code=303)
 
+@app.get("/analytics", response_class=HTMLResponse)
+async def analytics_page(request: Request):
+    config = load_config()
+    db_path = os.path.abspath(config['database']['path'])
+    
+    service_stats = {}
+    security_stats = {"safe": 0, "vulnerable": 0}
+    raw_data = [] # ПОЛНЫЙ СПИСОК ДЛЯ ФРОНТЕНДА
+    
+    if os.path.exists(db_path):
+        async with aiosqlite.connect(db_path) as db:
+            async with db.execute("SELECT ip, port, service, vulns FROM scan_results") as cursor:
+                async for row in cursor:
+                    svc_full = row[2] if row[2] else "Unknown"
+                    svc_main = svc_full.split()[0]
+                    is_vulnerable = row[3] and "•" in str(row[3])
+                    
+                    # Группировка для графиков
+                    service_stats[svc_main] = service_stats.get(svc_main, 0) + 1
+                    if is_vulnerable: security_stats["vulnerable"] += 1
+                    else: security_stats["safe"] += 1
+                    
+                    # Данные для JS-фильтрации
+                    raw_data.append({
+                        "ip": row[0],
+                        "port": row[1],
+                        "service": svc_main,
+                        "vulnerable": "Уязвимы" if is_vulnerable else "Безопасны"
+                    })
+
+    return templates.TemplateResponse(request, "analytics.html", {
+        "config": config,
+        "service_labels": list(service_stats.keys()),
+        "service_values": list(service_stats.values()),
+        "sec_labels": ["Уязвимы", "Безопасны"],
+        "sec_values": [security_stats["vulnerable"], security_stats["safe"]],
+        "total_ports": len(raw_data),
+        "raw_data_json": json.dumps(raw_data), # Передаем в JS
+        "active_page": "analytics"
+    })
+
 @app.post("/results/clear")
 async def clear_all_results():
     config = load_config()
