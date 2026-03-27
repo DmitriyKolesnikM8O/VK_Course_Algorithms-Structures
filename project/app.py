@@ -13,15 +13,22 @@ from fastapi import FastAPI, Request, Form, Response
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
-# Импорт логики и менеджера БД
-from main import run_single_scan
+from main import main as scan_logic
 from src.database import DatabaseManager
 
+# ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ СОСТОЯНИЯ
 SCAN_STATUS = "idle"
 NEXT_SCAN_TIME = None
+CURRENT_TASK = None
+PROGRESS = {"current": 0, "total": 0, "ip": ""}
 
 def load_config():
-    """Загрузка конфигурации с защитой от отсутствующих ключей."""
+    """
+    Загружает конфигурацию из config/config.yaml.
+    Если файл отсутствует, возвращает словарь с дефолтными значениями.
+    Выполняет рекурсивное слияние с дефолтами для предотвращения KeyError.
+    """
+    
     path = "config/config.yaml"
     defaults = {
         "scanner": {"targets": "8.8.8.8", "ports": "80, 443", "rate": 1000, "interface": "eth0"},
@@ -40,7 +47,6 @@ def load_config():
         except:
             config = {}
     
-    # Рекурсивное слияние с дефолтами
     for key, value in defaults.items():
         if key not in config:
             config[key] = value
@@ -51,28 +57,54 @@ def load_config():
     return config
 
 def save_config(config):
-    """Сохранение конфигурации в YAML."""
+    """
+    Сохраняет переданный словарь конфигурации в файл config/config.yaml в формате YAML.
+    """
+    
     os.makedirs("config", exist_ok=True)
     with open("config/config.yaml", "w") as f:
         yaml.dump(config, f, default_flow_style=False)
 
+
+def update_progress(current, total, ip):
+    """
+    Callback-функция для обновления глобального прогресса сканирования.
+    Вызывается из модуля main.py во время анализа найденных портов.
+    """
+    
+    global PROGRESS
+    PROGRESS["current"] = current
+    PROGRESS["total"] = total
+    PROGRESS["ip"] = ip
+
 async def background_scan_task():
-    """Фоновая задача сканирования."""
-    global SCAN_STATUS
+    """
+    Корутина для запуска логики сканирования в фоновом режиме.
+    Управляет статусом SCAN_STATUS и сбрасывает PROGRESS по завершении.
+    Поддерживает обработку исключения принудительной остановки (asyncio.CancelledError).
+    """
+    
+    global SCAN_STATUS, PROGRESS
     if SCAN_STATUS == "scanning": return
     SCAN_STATUS = "scanning"
+    PROGRESS = {"current": 0, "total": 0, "ip": "Masscan..."}
     print(f"[PROCESS] Сканирование начато: {datetime.now().strftime('%H:%M:%S')}")
     try:
-        await run_single_scan()
+        await scan_logic(progress_callback=update_progress)
     except Exception as e:
         print(f"[ERROR] Scan failed: {e}")
         traceback.print_exc()
     finally:
         SCAN_STATUS = "idle"
+        PROGRESS = {"current": 0, "total": 0, "ip": ""}
         print(f"[PROCESS] Сканирование завершено.")
 
 async def periodic_scan_loop():
-    """Фоновый цикл планировщика."""
+    """
+    Бесконечный цикл планировщика задач. 
+    Раз в 5 секунд проверяет, не пора ли запустить сканирование по расписанию.
+    """
+    
     global NEXT_SCAN_TIME
     print("[WEB-APP] Фоновый планировщик запущен.")
     
@@ -102,7 +134,11 @@ async def periodic_scan_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Управление жизненным циклом приложения."""
+    """
+    Управляет жизненным циклом приложения: выполняется при старте и остановке сервера.
+    Инициализирует БД и запускает планировщик.
+    """
+    
     if not os.path.exists("config/config.yaml"):
         save_config(load_config())
     config = load_config()
@@ -115,18 +151,25 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="CyberGuard Web Dashboard", lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
 
+# ENDPOINTS
+
 @app.get("/status")
 async def get_status():
+    """
+    Возвращает текущий статус сканера и прогресс для AJAX-запросов фронтенда.
+    """
+    
     config = load_config()
     enabled = config.get('scheduling', {}).get('enabled', False)
-    if not enabled: next_val = "Выключен"
-    elif NEXT_SCAN_TIME: next_val = NEXT_SCAN_TIME.strftime("%H:%M:%S")
-    else: next_val = "Расчет..."
-    
-    return {"status": SCAN_STATUS, "next_scan": next_val, "is_enabled": enabled}
+    next_val = NEXT_SCAN_TIME.strftime("%H:%M:%S") if NEXT_SCAN_TIME else ("Выключен" if not enabled else "Запуск...")    
+    return {"status": SCAN_STATUS, "next_scan": next_val, "is_enabled": enabled, "progress": PROGRESS}
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
+    """
+    Главная страница: отображает Дашборд с результатами сканирования.
+    """
+    
     config = load_config()
     db_path = os.path.abspath(config['database']['path'])
     results = []
@@ -143,14 +186,48 @@ async def index(request: Request):
 
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request, saved: bool = False):
+    """
+    Страница настроек: позволяет редактировать конфигурацию.
+    """
+    
     config = load_config()
     return templates.TemplateResponse(request, "settings.html", {
         "config": config, "config_json": json.dumps(config, indent=4, ensure_ascii=False),
         "is_scanning": (SCAN_STATUS == "scanning"), "saved": saved, "active_page": "settings"
     })
 
+@app.post("/scan")
+async def start_scan(targets: str = Form(...), ports: str = Form(...)):
+    """
+    Принимает форму с дашборда и запускает ручное сканирование.
+    """
+    
+    global CURRENT_TASK
+    if SCAN_STATUS == "scanning": return RedirectResponse(url="/", status_code=303)
+    config = load_config()
+    config['scanner']['targets'], config['scanner']['ports'] = targets, ports
+    save_config(config)
+    
+    CURRENT_TASK = asyncio.create_task(background_scan_task())
+    return RedirectResponse(url="/", status_code=303)
+
+@app.post("/scan/stop")
+async def stop_scan():
+    """
+    Прерывает выполнение текущей задачи сканирования через CancelledError.
+    """
+    
+    global CURRENT_TASK
+    if CURRENT_TASK and not CURRENT_TASK.done():
+        CURRENT_TASK.cancel()
+    return RedirectResponse(url="/", status_code=303)
+
 @app.get("/export/csv")
 async def export_csv():
+    """
+    Генерирует и отдает CSV-файл со всеми результатами из БД.
+    """
+    
     config = load_config()
     db_path = os.path.abspath(config['database']['path'])
     output = io.StringIO()
@@ -169,6 +246,10 @@ async def export_csv():
 
 @app.get("/export/json")
 async def export_json():
+    """
+    Генерирует и отдает красиво отформатированный JSON-файл с результатами.
+    """
+    
     config = load_config()
     db_path = os.path.abspath(config['database']['path'])
     data = []
@@ -182,7 +263,6 @@ async def export_json():
                         "timestamp": row[6]
                     })
     
-    # КРАСИВОЕ ФОРМАТИРОВАНИЕ: indent=4 делает JSON читаемым
     json_pretty = json.dumps(data, indent=4, ensure_ascii=False)
     filename = f"scan_report_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
     headers = {"Content-Disposition": f"attachment; filename={filename}"}
@@ -200,6 +280,10 @@ async def save_all_settings(
     sched_enabled: bool = Form(False),
     sched_interval: int = Form(60)
 ):
+    """
+    Принимает данные из формы настроек и обновляет config.yaml.
+    """
+    
     global NEXT_SCAN_TIME
     current_cfg = load_config()
     new_cfg = {
@@ -213,23 +297,19 @@ async def save_all_settings(
     NEXT_SCAN_TIME = None
     return RedirectResponse(url="/settings?saved=true", status_code=303)
 
-@app.post("/scan")
-async def start_scan(targets: str = Form(...), ports: str = Form(...)):
-    if SCAN_STATUS == "scanning": return RedirectResponse(url="/", status_code=303)
-    config = load_config()
-    config['scanner']['targets'], config['scanner']['ports'] = targets, ports
-    save_config(config)
-    asyncio.create_task(background_scan_task())
-    return RedirectResponse(url="/", status_code=303)
 
 @app.get("/analytics", response_class=HTMLResponse)
 async def analytics_page(request: Request):
+    """
+    Страница аналитики: агрегирует данные и передает их для отрисовки графиков Chart.js.
+    """
+    
     config = load_config()
     db_path = os.path.abspath(config['database']['path'])
     
     service_stats = {}
     security_stats = {"safe": 0, "vulnerable": 0}
-    raw_data = [] # ПОЛНЫЙ СПИСОК ДЛЯ ФРОНТЕНДА
+    raw_data = [] 
     
     if os.path.exists(db_path):
         async with aiosqlite.connect(db_path) as db:
@@ -239,12 +319,12 @@ async def analytics_page(request: Request):
                     svc_main = svc_full.split()[0]
                     is_vulnerable = row[3] and "•" in str(row[3])
                     
-                    # Группировка для графиков
+                    
                     service_stats[svc_main] = service_stats.get(svc_main, 0) + 1
                     if is_vulnerable: security_stats["vulnerable"] += 1
                     else: security_stats["safe"] += 1
                     
-                    # Данные для JS-фильтрации
+                    
                     raw_data.append({
                         "ip": row[0],
                         "port": row[1],
@@ -259,12 +339,16 @@ async def analytics_page(request: Request):
         "sec_labels": ["Уязвимы", "Безопасны"],
         "sec_values": [security_stats["vulnerable"], security_stats["safe"]],
         "total_ports": len(raw_data),
-        "raw_data_json": json.dumps(raw_data), # Передаем в JS
+        "raw_data_json": json.dumps(raw_data), 
         "active_page": "analytics"
     })
 
 @app.post("/results/clear")
 async def clear_all_results():
+    """
+    Очищает всю таблицу результатов в базе данных.
+    """
+    
     config = load_config()
     async with aiosqlite.connect(os.path.abspath(config['database']['path'])) as db:
         await db.execute("DELETE FROM scan_results"); await db.commit()
@@ -272,6 +356,10 @@ async def clear_all_results():
 
 @app.post("/results/delete")
 async def delete_single_result(ip: str = Form(...), port: int = Form(...)):
+    """
+    Удаляет конкретную запись из БД по паре IP и Порт.
+    """
+    
     config = load_config()
     async with aiosqlite.connect(os.path.abspath(config['database']['path'])) as db:
         await db.execute("DELETE FROM scan_results WHERE ip=? AND port=?", (ip, port)); await db.commit()

@@ -4,10 +4,27 @@ import subprocess
 from src.models import PortResult
 
 class MasscanScanner:
+    """
+    Обертка над утилитой Masscan для быстрого асинхронного сканирования портов.
+    Реализует параллельное чтение результатов (stdout) и прогресса (stderr).
+    """
+
     def __init__(self, config):
+        """
+        Args:
+            config (dict): Словарь с настройками (targets, ports, rate, interface).
+        """
+        
         self.cfg = config
 
     async def run_scan(self):
+        """
+        Запускает Masscan и обрабатывает потоки вывода в реальном времени.
+        
+        Returns:
+            list[PortResult]: Список найденных открытых портов.
+        """
+                
         cmd = [
             "sudo", "masscan",
             self.cfg['targets'],
@@ -27,8 +44,12 @@ class MasscanScanner:
 
         stdout_chunks = []
 
-        # Функция для чтения прогресса (stderr)
+        
         async def read_stderr():
+            """
+            Читает stderr и выводит прогресс сканирования в консоль приложения.
+            """
+            
             while True:
                 line = await process.stderr.readline()
                 if not line:
@@ -37,18 +58,22 @@ class MasscanScanner:
                 if "waiting" in text or "remaining" in text or "done" in text:
                     print(f"    [MASSCAN PROGRESS] {text}")
 
-        # Функция для чтения результатов (stdout)
+        
         async def read_stdout():
+            """
+            Читает stdout и накапливает куски JSON данных.
+            """
+            
             while True:
                 line = await process.stdout.readline()
                 if not line:
                     break
                 stdout_chunks.append(line.decode())
 
-        # Запускаем чтение обоих потоков параллельно
+        
         await asyncio.gather(read_stderr(), read_stdout())
         
-        # Ждем завершения процесса
+        
         await process.wait()
 
         raw_output = "".join(stdout_chunks).strip()
@@ -56,7 +81,7 @@ class MasscanScanner:
             return []
 
         try:
-            # Чистим мусор перед JSON (иногда masscan выводит текст в stdout)
+            
             start_index = raw_output.find('[')
             if start_index != -1:
                 data = json.loads(raw_output[start_index:])

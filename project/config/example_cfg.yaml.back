@@ -1,0 +1,16 @@
+database:
+  path: data/scan_results.db
+scanner:
+  interface: YOUR_INTERFACE
+  ports: 1-1024
+  rate: 5000
+  targets: 45.33.32.156, AS42
+scheduling:
+  enabled: false
+  interval_minutes: 20
+telegram:
+  chat_id: 'YOUR_CHATID'
+  token: YOUR_TOKEN
+vulners:
+  api_key: YOUR_APIKEY
+

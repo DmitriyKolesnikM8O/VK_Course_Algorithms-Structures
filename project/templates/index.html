@@ -2,12 +2,23 @@
 
 {% block content %}
     <div id="scan-alert" class="alert alert-primary border-0 shadow-sm {% if not is_scanning %}d-none{% endif %}" role="alert">
-        <div class="d-flex align-items-center">
-            <div class="spinner-border spinner-border-sm me-3" role="status"></div>
-            <div><strong>Идет активное сканирование...</strong> Результаты появятся автоматически.</div>
+        <div class="d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center">
+                <div class="spinner-border spinner-border-sm me-3" role="status"></div>
+                <div>
+                    <strong>Идет сканирование...</strong> 
+                    <span id="progress-text" class="badge bg-white text-primary ms-2">
+                        {% if is_scanning %} Анализ... {% endif %}
+                    </span>
+                    <div class="small opacity-75" id="current-ip-text">Ожидание данных...</div>
+                </div>
+            </div>
+            <!-- КНОПКА ОСТАНОВКИ -->
+            <form action="/scan/stop" method="post" onsubmit="return confirm('Прервать сканирование?');">
+                <button type="submit" class="btn btn-sm btn-danger fw-bold shadow-sm">🛑 Остановить</button>
+            </form>
         </div>
     </div>
-
     <div class="row">
         <!-- Левая панель -->
         <div class="col-xl-3 col-lg-4">
@@ -117,28 +128,37 @@
     <script>
         // Функция опроса статуса
         setInterval(async () => {
-            try {
-                const response = await fetch('/status');
-                const data = await response.json();
-                
-                // Обновляем текст и цвет Badge времени
-                const badge = document.getElementById('next-scan-badge');
-                if (badge) {
-                    badge.innerText = data.next_scan;
-                    if (data.is_enabled) {
-                        badge.className = "badge bg-success fw-bold";
-                    } else {
-                        badge.className = "badge bg-secondary fw-bold";
-                    }
-                }
+        try {
+            const response = await fetch('/status');
+            const data = await response.json();
+        
+            // 1. Обновляем Badge времени
+            const badge = document.getElementById('next-scan-badge');
+            if (badge) {
+                badge.innerText = data.next_scan;
+                badge.className = data.is_enabled ? "badge bg-success fw-bold" : "badge bg-secondary fw-bold";
+            }
 
-                // Перезагрузка при окончании сканирования
-                {% if is_scanning %}
-                if (data.status === 'idle') {
-                    window.location.href = "/"; 
-                }
-                {% endif %}
-            } catch (err) { console.error("Status check failed", err); }
-        }, 3000);
-    </script>
+            // 2. Обновляем прогресс-бар [1/138]
+            const progText = document.getElementById('progress-text');
+            const ipText = document.getElementById('current-ip-text');
+            if (data.status === 'scanning' && data.progress.total > 0) {
+                progText.innerText = `[ ${data.progress.current} / ${data.progress.total} ]`;
+                ipText.innerText = `Анализ узла: ${data.progress.ip}`;
+            }
+
+            // 3. Если скан был и закончился - рефреш
+            {% if is_scanning %}
+            if (data.status === 'idle') window.location.href = "/";
+            {% endif %}
+        
+            // 4. Если скана не было, но он начался (авто-запуск) - рефреш
+            {% if not is_scanning %}
+            if (data.status === 'scanning') window.location.href = "/";
+            {% endif %}
+
+        } catch (err) { console.error(err); }
+    }, 3000);    
+            
+        </script>
 {% endblock %}

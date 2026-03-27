@@ -1,1 +1,17 @@
-project/config/*.yaml
+# Python окружение и кэш
+project/venv/
+project/__pycache__/
+project/src/__pycache__/
+project/**/*.pyc
+
+# Данные и временные файлы сканеров
+project/data/*.db
+project/paused.conf
+project/*.log
+
+# Конфигурация с секретами (токены и ключи)
+project/config/config.yaml
+
+# Файлы настроек IDE
+project/.vscode/
+project/.idea/

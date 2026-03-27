@@ -12,7 +12,22 @@ from src.cve_checker import VulnersChecker
 from src.exploit_linker import ExploitLinker
 from src.asn_lookup import ASNResolver
 
-async def main():
+async def main(progress_callback=None):
+    """
+    Основной оркестратор сканирования.
+    
+    Аргументы:
+        progress_callback (callable): Функция для отправки прогресса на веб-интерфейс.
+    
+    Логика:
+    1. Резолвит ASN цели в IP-префиксы.
+    2. Запускает Masscan для быстрого обнаружения открытых портов.
+    3. Сверяет найденные порты с БД.
+    4. Для новых портов запускает глубокий анализ (Nmap + Vulners).
+    5. Отправляет уведомления в Telegram.
+    6. Сохраняет результаты в БД.
+    """
+    
     print(f"\n[{datetime.now().strftime('%H:%M:%S')}] --- ЗАПУСК МОДУЛЯ СКАНИРОВАНИЯ ---")
     
     try:
@@ -21,13 +36,11 @@ async def main():
     except Exception as e:
         print(f"[!] КРИТИЧЕСКАЯ ОШИБКА КОНФИГА: {e}"); return
 
-    # 1. Подготовка БД
     db_path = config['database']['path']
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     db = DatabaseManager(db_path)
     await db.init_db()
     
-    # 2. Обработка целей (IP + ASN)
     print("[*] Этап 1: Сбор и резолвинг целей...")
     raw_targets = str(config['scanner'].get('targets', '')).split(',')
     final_targets = []
@@ -47,44 +60,44 @@ async def main():
     if not final_targets:
         print("[!] Список целей пуст. Выход."); return
 
-    # 3. Инициализация инструментов
     scanner = MasscanScanner({**config['scanner'], 'targets': ",".join(final_targets)})
     analyzer = ServiceAnalyzer()
     nmap = NmapAnalyzer()
     notifier = TelegramNotifier(config['telegram']['token'], config['telegram']['chat_id'])
     v_checker = VulnersChecker(api_key=config.get('vulners', {}).get('api_key', ''))
 
-    # 4. Быстрый скан Masscan
     print(f"[*] Этап 2: Запуск Masscan (целей: {len(final_targets)})...")
     known_ports = await db.get_all_known_ports()
     current_results = await scanner.run_scan()
     print(f"[+] Masscan завершен. Найдено открытых портов: {len(current_results)}")
+
+    current_results = await scanner.run_scan()
+    total_found = len(current_results)
     
-    # 5. Глубокий анализ
     new_threats = []
     total_found = len(current_results)
     
     for idx, res in enumerate(current_results, 1):
+        if progress_callback:
+            progress_callback(idx, total_found, res.ip)
+
+        
         if (res.ip, res.port) not in known_ports:
             print(f"    [{idx}/{total_found}] АНАЛИЗ НОВОГО ПОРТА: {res.ip}:{res.port}")
             
-            # Banner Grabbing
             print(f"      > Получение баннера...")
             res.banner = await analyzer.grab_banner(res.ip, res.port)
             
-            # Nmap
             print(f"      > Запуск Nmap deep scan (может занять до 2 мин)...")
             s_name, s_version, _ = await nmap.analyze(res.ip, res.port)
             res.service = f"{s_name} {s_version}".strip()
             print(f"      > Сервис определен: {res.service}")
             
-            # Vulners
             print(f"      > Поиск уязвимостей в Vulners API...")
             vuln_list = await v_checker.get_cves(s_name, s_version)
             enriched = ExploitLinker.wrap_cve_with_links(vuln_list)
             res.vulns = "\n\n".join(enriched) if enriched else "No critical CVEs found"
             
-            # Telegram
             print(f"      > Отправка уведомления в Telegram...")
             safe_service = html.escape(res.service[:100])
             safe_banner = html.escape(res.banner[:200])
@@ -93,7 +106,7 @@ async def main():
                    f"Service: <b>{safe_service}</b>\n"
                    f"Banner: <code>{safe_banner}</code>\n\n"
                    f"Vulns:\n{res.vulns}")
-            
+
             resp = await notifier.send_message(msg)
             if resp and resp.status_code == 200:
                 new_threats.append(res)
@@ -104,7 +117,6 @@ async def main():
         else:
             print(f"    [{idx}/{total_found}] Пропуск (уже в базе): {res.ip}:{res.port}")
 
-    # 6. Сохранение в базу
     if new_threats:
         print(f"[*] Этап 3: Сохранение {len(new_threats)} новых записей в БД...")
         await db.update_ports(new_threats)
@@ -115,6 +127,10 @@ async def main():
     print(f"[{datetime.now().strftime('%H:%M:%S')}] --- СКАНИРОВАНИЕ ЗАВЕРШЕНО ---\n")
 
 async def run_single_scan():
+    """
+    Функция-обертка для запуска main() без аргументов.
+    """
+    
     await main()
 
 if __name__ == "__main__":

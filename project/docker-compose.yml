@@ -1,0 +1,11 @@
+
+services:
+  cyberguard:
+    build: .
+    container_name: cyberguard_scanner
+    network_mode: "host"  # ВАЖНО: Masscan требует прямого доступа к сетевой карте
+    privileged: true      # Дает права на raw-сокеты (аналог sudo)
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data
+    restart: always
